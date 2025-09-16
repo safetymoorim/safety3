@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Safety Dodger – 제조업 안전 에디션</title>
+  <style>
+    :root{color-scheme:dark light}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#0b1220;color:#e6eaf3}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    .grid{display:grid;gap:20px}
+    @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:#101826;border:1px solid #233044;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    .card .hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #233044}
+    .card .bd{padding:16px}
+    .btn{border:0;border-radius:12px;padding:8px 12px;background:#2b3a4f;color:#e6eaf3;cursor:pointer}
+    .btn:hover{filter:brightness(1.1)}
+    .btn.green{background:#1f8b4c}
+    .btn.amber{background:#b07a15}
+    .btn.red{background:#b83a3a}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .field{background:#0d1522;border:1px solid #233044;border-radius:10px;padding:8px 10px;color:#e6eaf3;width:100%}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:8px 6px;border-top:1px solid #233044}
+    .hint{font-size:12px;color:#9fb0c7}
+    .mobile{display:none}
+    @media(max-width:899px){.mobile{display:flex;gap:10px;margin-top:10px}}
+    .overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:end;justify-content:center;padding:16px}
+    .modal{background:#0f1929;border:1px solid #233044;border-radius:16px;padding:14px;width:min(520px,92%)}
+    .title{font-weight:700;font-size:18px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="grid">
+      <!-- Game -->
+      <div class="card">
+        <div class="hd">
+          <div class="title">Safety Dodger – 제조업 안전 에디션</div>
+          <div class="row">
+            <button id="startBtn" class="btn green">시작하기</button>
+            <button id="pauseBtn" class="btn amber">일시정지</button>
+            <button id="resetBtn" class="btn">리셋</button>
+            <button id="helpBtn" class="btn">도움말</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div style="position:relative;max-width:420px;margin:0 auto">
+            <canvas id="cv" width="420" height="640" style="width:100%;border:1px solid #233044;border-radius:16px;display:block"></canvas>
+            <div id="over" class="overlay" style="display:none">
+              <div class="modal">
+                <div class="title" style="text-align:center">게임 종료</div>
+                <p style="text-align:center;margin:6px 0 10px 0">점수: <b id="finalScore">0</b></p>
+                <div class="two">
+                  <input id="dept" class="field" placeholder="부서" />
+                  <input id="name" class="field" placeholder="성함" />
+                </div>
+                <div class="row" style="margin-top:10px;justify-content:flex-end">
+                  <button id="saveBtn" class="btn green">리더보드에 등록</button>
+                  <button id="closeOverBtn" class="btn">닫기</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mobile">
+            <button id="leftBtn" class="btn" style="flex:1">◀ 왼쪽</button>
+            <button id="rightBtn" class="btn" style="flex:1">오른쪽 ▶</button>
+          </div>
+
+          <div id="help" class="hint" style="margin-top:10px;display:none">
+            조작: 방향키(←/→) 또는 A/D. 모바일은 아래 버튼.<br/>
+            규칙: 파란 블록(안전요소) 먹으면 +1점, 빨간 블록(불안전요소)에 맞으면 종료.<br/>
+            난이도는 시간이 지날수록 빨라집니다. Space로 시작/재시작, P로 일시정지.
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="card">
+        <div class="hd">
+          <div class="title">리더보드</div>
+          <div class="row">
+            <button id="exportBtn" class="btn">내보내기</button>
+            <button id="importBtn" class="btn">가져오기</button>
+            <button id="clearBtn" class="btn red">전체삭제</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="two" style="margin-bottom:10px">
+            <input id="prefDept" class="field" placeholder="기본 부서(자동 채우기)" />
+            <input id="prefName" class="field" placeholder="기본 성함(자동 채우기)" />
+          </div>
+          <p class="hint" style="margin:-6px 0 10px 0">입력하면 게임오버 창에 자동 채워져요. 데이터는 브라우저에만 저장됩니다.</p>
+
+          <div style="overflow:auto">
+            <table id="tbl">
+              <thead>
+                <tr><th>순위</th><th>부서</th><th>성함</th><th>점수</th><th>일시</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <!-- Export/Import area -->
+          <div id="io" style="margin-top:10px;display:none">
+            <textarea id="jsonBox" class="field" style="height:140px;font-family:ui-monospace,Consolas,monospace"></textarea>
+            <p class="hint">내보내기: JSON이 표시됩니다. 복사하세요. / 가져오기: JSON을 붙여넣고 ‘가져오기’ 버튼을 다시 누르세요.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ========= 데이터 & 상수 ========= */
+const HAZARDS = [
+  "TBM 미실시","안전대 미착용","방호장치 임의해제","사다리 부적절 사용",
+  "추락방지난간 미설치","밀폐공간 절차 미준수","L/TO 미실시",
+  "보안경 미착용","소화기 미비치","작업허가서 미준수"
+];
+const SAFETIES = [
+  "TBM 실시","안전대 착용","산소/유해가스 측정","방호장치 정상가동",
+  "안전난간 설치","밀폐공간 절차 준수","L/TO 실시",
+  "PPE 착용","소화기 점검","작업허가서 준수"
+];
+
+const W=420,H=640, PW=60, PH=16, IW=54, IH=28, BASE=2.2, SPAWN=700;
+const STORAGE_KEY="safety_dodger_lb_v1";
+
+/* ========= 상태 ========= */
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+let playerX=(W-PW)/2, items=[], score=0, running=false, over=false, speed=1;
+let last=performance.now(), lastSpawn=0, keys={};
+
+/* ========= 유틸 ========= */
+const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+const rPick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
+function roundRect(x,y,w,h,r){
+  r=Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+/* ========= 입력 ========= */
+window.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  if((e.key===' '||e.key==='Enter') && !running && !over) start();
+  if(e.key.toLowerCase()==='p' && running) pause();
+});
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false });
+
+/* 모바일 버튼 */
+let touchDir=null;
+document.getElementById('leftBtn').ontouchstart=()=>{touchDir='left'};
+document.getElementById('leftBtn').ontouchend=()=>{touchDir=null};
+document.getElementById('rightBtn').ontouchstart=()=>{touchDir='right'};
+document.getElementById('rightBtn').ontouchend=()=>{touchDir=null};
+
+/* ========= 게임 루프 ========= */
+function loop(now){
+  const dt=(now-last)/16.6667; last=now;
+
+  if(running){
+    const step=6*dt;
+    const l = keys['arrowleft']||keys['a'] || touchDir==='left';
+    const r = keys['arrowright']||keys['d'] || touchDir==='right';
+    playerX=clamp(playerX+(r?step:0)-(l?step:0),0,W-PW);
+
+    if(now-lastSpawn>Math.max(180,SPAWN/speed)){
+      lastSpawn=now;
+      const isSafe=Math.random()<0.55;
+      items.push({
+        x:Math.random()*(W-IW),
+        y:-IH,
+        vy:(BASE+Math.random()*1.4)*speed,
+        type:isSafe?'safety':'hazard',
+        label:isSafe?rPick(SAFETIES):rPick(HAZARDS)
+      });
+    }
+
+    speed=Math.min(3.5, speed+0.0007*dt);
+
+    const next=[]; let gain=0;
+    for(const it of items){
+      const ny=it.y+it.vy*dt*3, nx=it.x;
+      const hit = ny+IH>=H-PH-6 && nx<playerX+PW && nx+IW>playerX;
+      if(hit){
+        if(it.type==='hazard'){ end(); break; }
+        else { gain++; continue; }
+      }
+      if(ny<H+40) { it.y=ny; next.push(it); }
+    }
+    items=next;
+    if(gain) score+=gain;
+  }
+
+  /* draw */
+  // bg
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0f172a'); g.addColorStop(1,'#111827');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // HUD
+  ctx.fillStyle='#e5e7eb'; ctx.font='bold 18px system-ui,Segoe UI,Roboto';
+  ctx.fillText('Score: '+score, 12, 24);
+  ctx.fillText('Speed: x'+speed.toFixed(2), W-150, 24);
+  // player
+  ctx.fillStyle='#22c55e'; ctx.fillRect(playerX, H-PH-6, PW, PH);
+  // items
+  for(const it of items){
+    ctx.fillStyle = it.type==='hazard' ? '#ef4444' : '#3b82f6';
+    roundRect(it.x,it.y,IW,IH,6); ctx.fill();
+    ctx.fillStyle='#f9fafb'; ctx.font='12px system-ui,Segoe UI,Roboto';
+    const label = it.label.length>12 ? it.label.slice(0,12)+'…' : it.label;
+    ctx.fillText(label, it.x+6, it.y+18);
+  }
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ========= 컨트롤 ========= */
+function start(){
+  items=[]; score=0; speed=1; over=false; running=true; lastSpawn=performance.now();
+  // 기본 입력값 자동 채우기
+  document.getElementById('dept').value = document.getElementById('prefDept').value || '';
+  document.getElementById('name').value = document.getElementById('prefName').value || '';
+  document.getElementById('over').style.display='none';
+}
+function pause(){ running=false }
+function end(){ running=false; over=true; document.getElementById('finalScore').textContent=String(score); document.getElementById('over').style.display='flex' }
+
+document.getElementById('startBtn').onclick=start;
+document.getElementById('pauseBtn').onclick=pause;
+document.getElementById('resetBtn').onclick=()=>{running=false;over=false;items=[];score=0;speed=1;document.getElementById('over').style.display='none'};
+document.getElementById('helpBtn').onclick=()=>{const h=document.getElementById('help');h.style.display=h.style.display==='none'?'block':'none'};
+document.getElementById('closeOverBtn').onclick=()=>{document.getElementById('over').style.display='none'};
+
+/* ========= 리더보드 ========= */
+function readLB(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]') }catch(_){ return [] }
+}
+function writeLB(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)) }
+function renderLB(){
+  const tbody=document.querySelector('#tbl tbody'); tbody.innerHTML='';
+  const lb=readLB();
+  lb.forEach((r,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td>${r.dept||''}</td><td>${r.name||''}</td><td><b>${r.score}</b></td><td style="color:#9fb0c7">${new Date(r.dateISO).toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+renderLB();
+
+document.getElementById('saveBtn').onclick=()=>{
+  const dept=document.getElementById('dept').value.trim();
+  const name=document.getElementById('name').value.trim();
+  if(!dept || !name){ alert('부서와 성함을 입력해주세요.'); return }
+  const next=[...readLB(), {dept,name,score, dateISO:new Date().toISOString()}].sort((a,b)=>b.score-a.score);
+  writeLB(next); renderLB();
+  document.getElementById('over').style.display='none';
+};
+document.getElementById('clearBtn').onclick=()=>{
+  if(confirm('리더보드를 모두 삭제할까요?')){ localStorage.removeItem(STORAGE_KEY); renderLB() }
+};
+document.getElementById('exportBtn').onclick=()=>{
+  document.getElementById('io').style.display='block';
+  document.getElementById('jsonBox').value = JSON.stringify(readLB(), null, 2);
+};
+document.getElementById('importBtn').onclick=()=>{
+  const box=document.getElementById('jsonBox');
+  const txt=box.value.trim(); if(!txt){ document.getElementById('io').style.display='block'; box.placeholder='여기에 JSON 붙여넣기'; return }
+  try{
+    const merged=[...readLB(), ...JSON.parse(txt)].sort((a,b)=>b.score-a.score);
+    writeLB(merged); renderLB(); alert('가져오기 완료!');
+  }catch(e){ alert('JSON 형식이 올바르지 않습니다.'); }
+};
+</script>
+</body>
+</html>
